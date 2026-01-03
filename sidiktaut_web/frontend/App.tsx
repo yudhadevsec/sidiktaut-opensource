@@ -10,7 +10,6 @@ export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
   
   // --- PERBAIKAN DARK MODE (SMART INIT) ---
-  // Cek LocalStorage dulu, kalau kosong cek settingan Laptop/HP user
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const savedTheme = localStorage.getItem('theme');
@@ -26,7 +25,6 @@ export default function App() {
   const [ipCopied, setIpCopied] = useState(false);
 
   // --- PERBAIKAN EFFECT DARK MODE ---
-  // Langsung tembak class ke HTML root agar tidak jitter
   useEffect(() => {
     const root = window.document.documentElement;
     if (darkMode) {
@@ -38,25 +36,60 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // PERBAIKAN 1: MENGATASI CONNECTION ERROR
+  // --- PERBAIKAN 2: SMART IP FETCH ---
   useEffect(() => {
-    const fetchIp = async () => {
+    const fetchIpSmart = async () => {
+      const cached = sessionStorage.getItem('sidiktaut_ip_cache');
+      if (cached) {
+        setIpData(JSON.parse(cached));
+        return;
+      }
+
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error("Limit");
+        
+        const data = await res.json();
+        const cleanData = {
+            ip: data.ip,
+            city: data.city,
+            country_code: data.country_code,
+            org: data.org
+        };
+        
+        setIpData(cleanData);
+        sessionStorage.setItem('sidiktaut_ip_cache', JSON.stringify(cleanData));
+
+      } catch (e) {
+        console.warn("Primary IP API failed, switching to backup...");
+        
         try {
-            const res = await fetch('https://ipapi.co/json/');
-            if (!res.ok) throw new Error("Network response was not ok");
-            const data = await res.json();
-            setIpData(data);
-        } catch (e) {
-            console.error("Fetch Error:", e);
+            const resBackup = await fetch('https://ipwho.is/');
+            if (!resBackup.ok) throw new Error("Backup Limit");
+            
+            const dataBackup = await resBackup.json();
+            const cleanDataBackup = {
+                ip: dataBackup.ip,
+                city: dataBackup.city,
+                country_code: dataBackup.country_code,
+                org: dataBackup.connection?.isp || dataBackup.isp || "Unknown ISP"
+            };
+
+            setIpData(cleanDataBackup);
+            sessionStorage.setItem('sidiktaut_ip_cache', JSON.stringify(cleanDataBackup));
+            
+        } catch (finalError) {
             setIpData({ 
-                ip: 'Unavailable', 
-                city: 'Unknown', 
-                country_code: '-', 
-                org: 'Connection Limit/Error' 
+                ip: "Unavailable", 
+                city: "-", 
+                country_code: "-", 
+                org: "Connection Offline" 
             });
         }
+      }
     };
-    fetchIp();
+
+    fetchIpSmart();
   }, []);
 
   const copyIp = () => {
@@ -88,10 +121,9 @@ export default function App() {
   };
 
   return (
-    // Tambahkan 'ease-in-out' agar transisi warna lebih lembut (anti-jitter)
     <div className="flex flex-col md:flex-row h-screen bg-gray-50 dark:bg-[#09090b] text-gray-900 dark:text-white font-sans overflow-hidden transition-colors duration-300 ease-in-out">
       
-      {/* MOBILE HEADER (UPDATED: GRAY TEXT) */}
+      {/* MOBILE HEADER */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between px-4 z-50 transition-colors duration-300">
          <div className="flex items-center gap-3">
             <img 
@@ -99,10 +131,8 @@ export default function App() {
               alt="Logo SidikTaut" 
               className="w-8 h-8 object-contain" 
             />
-            {/* Teks Judul & Subtitle */}
             <div className="flex flex-col justify-center">
                 <span className="font-bold text-lg leading-none">SidikTaut</span>
-                {/* UBAH WARNA DISINI: text-gray-500 */}
                 <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 tracking-widest uppercase">Link Analyzer</span>
             </div>
          </div>
@@ -151,10 +181,8 @@ export default function App() {
       )}
       </AnimatePresence>
 
-      {/* SIDEBAR DESKTOP (UPDATED: GRAY TEXT & FIXED WIDTH BUTTON) */}
+      {/* SIDEBAR DESKTOP */}
       <aside className={`hidden md:flex flex-col border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-[#121214] transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
-         
-         {/* HEADER SIDEBAR */}
          <div className={`h-20 flex items-center border-b border-gray-50 dark:border-gray-800/50 ${sidebarCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
             {!sidebarCollapsed && (
               <div className="flex items-center gap-3 overflow-hidden">
@@ -165,10 +193,8 @@ export default function App() {
                       className="w-10 h-10 object-contain" 
                     />
                  </div>
-                 {/* Stack Title & Subtitle */}
                  <div className="flex flex-col justify-center">
                     <span className="font-black text-xl tracking-tight whitespace-nowrap text-gray-900 dark:text-white leading-none">SidikTaut</span>
-                    {/* UBAH WARNA DISINI: text-gray-500 */}
                     <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 tracking-widest uppercase mt-0.5">Link Analyzer</span>
                  </div>
               </div>
@@ -184,11 +210,9 @@ export default function App() {
             ))}
          </nav>
          <div className="p-4 border-t border-gray-100 dark:border-gray-800">
-            {/* BUTTON DARK MODE DESKTOP: FIXED WIDTH UNTUK MENCEGAH JITTER */}
             <button onClick={() => setDarkMode(!darkMode)} className={`w-full flex items-center gap-2 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium text-gray-500 dark:text-gray-400 transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}>
                {darkMode ? <Sun size={20} className="shrink-0"/> : <Moon size={20} className="shrink-0"/>} 
                {!sidebarCollapsed && (
-                   // min-w-[80px] memastikan lebar teks tidak berubah saat ganti kata Light/Dark
                    <span className="min-w-[80px] text-left">
                        {darkMode ? 'Light Mode' : 'Dark Mode'}
                    </span>
@@ -205,7 +229,7 @@ export default function App() {
             <div className="flex-1">
                <AnimatePresence mode="wait">
                    {activeView === 'dashboard' && (
-                     <motion.div key="dashboard" {...pageTransition} className="space-y-8">
+                     <motion.div key="dashboard" {...pageTransition} className="space-y-8 gpu-mode">
                        <Scanner />
                        <div>
                           <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wider mb-4 px-1"><Wifi size={18} className="text-blue-500"/> Identitas Koneksi Anda</h3>
@@ -225,10 +249,10 @@ export default function App() {
                                  </div>
                                  <div className="flex items-center justify-between gap-2">
                                     <h2 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight break-all">
-                                        {ipData?.ip || "Loading..."}
+                                            {ipData?.ip || "Loading..."}
                                     </h2>
                                     <button onClick={copyIp} className="p-3 bg-white dark:bg-black/20 rounded-xl text-gray-400 hover:text-blue-600 border border-gray-50 dark:border-gray-800 shrink-0">
-                                        {ipCopied ? <Check size={20} className="text-green-500"/> : <Copy size={20}/>}
+                                            {ipCopied ? <Check size={20} className="text-green-500"/> : <Copy size={20}/>}
                                     </button>
                                  </div>
                               </div>
@@ -252,9 +276,9 @@ export default function App() {
                        </div>
                      </motion.div>
                    )}
-                   {activeView === 'browser' && <motion.div key="browser" {...pageTransition}><BrowserView /></motion.div>}
-                   {activeView === 'cli' && <motion.div key="cli" {...pageTransition}><CliView /></motion.div>}
-                   {activeView === 'team' && <motion.div key="team" {...pageTransition}><TeamView /></motion.div>}
+                   {activeView === 'browser' && <motion.div key="browser" {...pageTransition} className="gpu-mode"><BrowserView /></motion.div>}
+                   {activeView === 'cli' && <motion.div key="cli" {...pageTransition} className="gpu-mode"><CliView /></motion.div>}
+                   {activeView === 'team' && <motion.div key="team" {...pageTransition} className="gpu-mode"><TeamView /></motion.div>}
                </AnimatePresence>
             </div>
          </div>
