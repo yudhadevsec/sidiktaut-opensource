@@ -2,7 +2,7 @@
  * SIDIKTAUT BACKGROUND SERVICE
  */
 
-const API_ENDPOINT = "https://yudhadevsec.pythonanywhere.com/scan";
+const API_ENDPOINT = "http://127.0.0.1:5000/scan";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -29,14 +29,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "REQUEST_SCAN") {
     handleScanRequest(request.url, sendResponse);
-    return true; 
+    return true;
   }
 });
 
 async function handleScanRequest(url, sendResponse) {
   try {
     const data = await fetchScanData(url);
-    sendResponse({ success: true, data: data });
+    sendResponse({ success: true, data });
   } catch (error) {
     sendResponse({ success: false, error: error.message });
   }
@@ -49,7 +49,7 @@ async function fetchScanData(url) {
       "Content-Type": "application/json",
       "X-CLIENT-ID": "sidiktaut-extension"
     },
-    body: JSON.stringify({ url: url })
+    body: JSON.stringify({ url })
   });
 
   if (!response.ok) throw new Error("Gagal terhubung ke Backend (Cek app.py)");
@@ -58,7 +58,7 @@ async function fetchScanData(url) {
 
 async function performScanAndNotify(url) {
   const notifId = `scan-${Date.now()}`;
-  
+
   chrome.notifications.create(notifId, {
     type: "basic",
     iconUrl: "icon.png",
@@ -74,12 +74,12 @@ async function performScanAndNotify(url) {
 
     const malicious = data.malicious || 0;
     const isSafe = malicious === 0;
-    
+
     chrome.notifications.create({
       type: "basic",
       iconUrl: "icon.png",
       title: isSafe ? "✅ Link Aman" : "⚠️ BAHAYA TERDETEKSI",
-      message: isSafe 
+      message: isSafe
         ? `Reputasi: ${data.reputation}/100. Aman.`
         : `Ditemukan ${malicious} ancaman berbahaya!`,
       priority: 2,

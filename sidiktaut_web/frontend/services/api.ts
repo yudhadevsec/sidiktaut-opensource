@@ -1,6 +1,6 @@
 import { ScanResponse } from "../types";
 
-const API_BASE_URL = "https://yudhadevsec.pythonanywhere.com";
+const API_BASE_URL = "/api";
 
 export const scanUrl = async (url: string): Promise<ScanResponse> => {
   try {
@@ -31,7 +31,7 @@ export const scanUrl = async (url: string): Promise<ScanResponse> => {
       err.message.includes("Failed to fetch") ||
       err.message.includes("NetworkError")
     ) {
-      throw new Error("Tidak bisa terhubung ke backend PythonAnywhere.");
+      throw new Error("Backend tidak merespon. Pastikan app.py jalan.");
     }
 
     throw err;
